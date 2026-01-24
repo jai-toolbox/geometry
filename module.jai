@@ -11,6 +11,22 @@ Indexed_Triangle_Positions :: struct {
     positions : [..] Vector3; 
 }
 
+Indexed_Triangle_Positions_Colors :: struct {
+    indices : [..] u32; 
+    positions : [..] Vector3; 
+    rgb_colors : [..] Vector3; 
+}
+
+init :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
+    itpc : Indexed_Triangle_Positions_Colors;
+    for itp.indices array_add(*itpc.indices, it);
+    for itp.positions array_add(*itpc.positions, it);
+    array_reserve(*itpc.rgb_colors, itpc.positions.count); 
+    for 1..itpc.positions.count array_add(*itpc.rgb_colors, color);  
+    return itpc;
+}
+
+
 generate_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, outer_radius: float, num_segments: int) -> Indexed_Triangle_Positions {
     annulus : Indexed_Triangle_Positions;
 
@@ -33,7 +49,7 @@ generate_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, oute
         outer_pos := center + dir * outer_radius;
         array_add(*annulus.positions, outer_pos);
 
-        // the idea is that if you cut this as a strip, you'd just be making quads
+        // an annulus is just a quad strip that's connected end-to-end, so just make quads
         array_add(*annulus.indices, cast (u32)(2 * it));
         array_add(*annulus.indices, cast (u32)(2 * next));
         array_add(*annulus.indices, cast (u32)(2 * it + 1));
@@ -44,5 +60,60 @@ generate_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, oute
     }
 
     return annulus;
+}
+
+generate_box :: (origin : Vector3, size_x : float, size_y : float, size_z : float) -> Indexed_Triangle_Positions {
+    box : Indexed_Triangle_Positions;
+
+    half_x := size_x / 2;
+    half_y := size_y / 2;
+    half_z := size_z / 2;
+
+    // 8 vertices
+    //     4-------5
+    //    /|      /|
+    //   / |     / |
+    //  7-------6  |
+    //  |  0----|--1
+    //  | /     | /
+    //  |/      |/
+    //  3-------2
+
+    array_add(*box.positions, origin + Vector3.{-half_x, -half_y, -half_z}); // 0
+    array_add(*box.positions, origin + Vector3.{ half_x, -half_y, -half_z}); // 1
+    array_add(*box.positions, origin + Vector3.{ half_x, -half_y,  half_z}); // 2
+    array_add(*box.positions, origin + Vector3.{-half_x, -half_y,  half_z}); // 3
+    array_add(*box.positions, origin + Vector3.{-half_x,  half_y, -half_z}); // 4
+    array_add(*box.positions, origin + Vector3.{ half_x,  half_y, -half_z}); // 5
+    array_add(*box.positions, origin + Vector3.{ half_x,  half_y,  half_z}); // 6
+    array_add(*box.positions, origin + Vector3.{-half_x,  half_y,  half_z}); // 7
+
+    // 12 triangles (2 per face, 6 faces) - CCW winding, outward normals
+
+    // bottom face (-y)
+    array_add(*box.indices, 0); array_add(*box.indices, 3); array_add(*box.indices, 2);
+    array_add(*box.indices, 0); array_add(*box.indices, 2); array_add(*box.indices, 1);
+
+    // top face (+y)
+    array_add(*box.indices, 4); array_add(*box.indices, 5); array_add(*box.indices, 6);
+    array_add(*box.indices, 4); array_add(*box.indices, 6); array_add(*box.indices, 7);
+
+    // front face (+z)
+    array_add(*box.indices, 3); array_add(*box.indices, 7); array_add(*box.indices, 6);
+    array_add(*box.indices, 3); array_add(*box.indices, 6); array_add(*box.indices, 2);
+
+    // back face (-z)
+    array_add(*box.indices, 1); array_add(*box.indices, 5); array_add(*box.indices, 4);
+    array_add(*box.indices, 1); array_add(*box.indices, 4); array_add(*box.indices, 0);
+
+    // left face (-x)
+    array_add(*box.indices, 0); array_add(*box.indices, 4); array_add(*box.indices, 7);
+    array_add(*box.indices, 0); array_add(*box.indices, 7); array_add(*box.indices, 3);
+
+    // right face (+x)
+    array_add(*box.indices, 1); array_add(*box.indices, 2); array_add(*box.indices, 6);
+    array_add(*box.indices, 1); array_add(*box.indices, 6); array_add(*box.indices, 5);
+
+    return box;
 }
 
