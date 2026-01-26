@@ -18,7 +18,7 @@ Indexed_Triangle_Positions_Colors :: struct {
     rgb_colors : [..] Vector3; 
 }
 
-init :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
+create_itpc_with_color :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
     itpc : Indexed_Triangle_Positions_Colors;
     for itp.indices array_add(*itpc.indices, it);
     for itp.positions array_add(*itpc.positions, it);
