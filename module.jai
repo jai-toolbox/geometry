@@ -1,5 +1,6 @@
 #import "Math";
 #import "Basic";
+#import "Random";
 
 #import "turns";
 #import "linear_algebra";
@@ -23,6 +24,22 @@ init :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_P
     for itp.positions array_add(*itpc.positions, it);
     array_reserve(*itpc.rgb_colors, itpc.positions.count); 
     for 1..itpc.positions.count array_add(*itpc.rgb_colors, color);  
+    return itpc;
+}
+
+create_itpc_with_color_variation :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
+    itpc : Indexed_Triangle_Positions_Colors;
+    for itp.indices array_add(*itpc.indices, it);
+    for itp.positions array_add(*itpc.positions, it);
+    array_reserve(*itpc.rgb_colors, itpc.positions.count); 
+    for 1..itpc.positions.count {
+        scale := 1.0;
+        r1 := random_get_zero_to_one();
+        r2 := random_get_zero_to_one();
+        r3 := random_get_zero_to_one();
+        random_color_offset := Vector3.{r1, r2, r3} * scale ;
+        array_add(*itpc.rgb_colors, color + random_color_offset);  
+    }
     return itpc;
 }
 
