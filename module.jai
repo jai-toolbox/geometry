@@ -18,6 +18,14 @@ Indexed_Triangle_Positions_Colors :: struct {
     rgb_colors : [..] Vector3; 
 }
 
+Indexed_Mesh :: struct {
+    indices             : [..] u32; 
+    positions           : [..] Vector3; 
+    normals             : [..] Vector3; 
+    texture_coordinates : [..] Vector2; 
+    rgb_colors          : [..] Vector3; 
+}
+
 create_itpc_with_color :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
     itpc : Indexed_Triangle_Positions_Colors;
     for itp.indices array_add(*itpc.indices, it);
