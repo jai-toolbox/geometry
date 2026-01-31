@@ -4,7 +4,7 @@
 
 #import "turns";
 #import "linear_algebra";
-#import "math";
+#import "tbx_math";
 
 
 Indexed_Triangle_Positions :: struct {
