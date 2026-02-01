@@ -2,9 +2,9 @@
 #import "Basic";
 #import "Random";
 
-#import "turns";
-#import "linear_algebra";
-#import "tbx_math";
+#import "tbx/turns";
+#import "tbx/linear_algebra";
+#import "tbx/math";
 
 
 Indexed_Triangle_Positions :: struct {
