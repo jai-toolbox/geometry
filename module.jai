@@ -142,3 +142,60 @@ generate_box :: (origin : Vector3, size_x : float, size_y : float, size_z : floa
     return box;
 }
 
+create_cylinder_between :: (p1: Vector3, p2: Vector3, segments: int, radius: float) -> Indexed_Triangle_Positions {
+    result: Indexed_Triangle_Positions;
+    
+    axis := p2 - p1;
+    up := unit_vector(axis);
+    
+    ortho, tangent := make_an_orthonormal_basis(up);
+    
+    angle_increment := cast(float)(2.0 * PI) / cast(float)segments;
+    
+    // top and bottom center vertices
+    array_add(*result.positions, p2); // top center, index 0
+    array_add(*result.positions, p1); // bottom center, index 1
+    
+    // vertices for top and bottom circles
+    for i: 0..segments-1 {
+        angle := cast(float)i * angle_increment;
+        offset := radius * (cos(angle) * ortho + sin(angle) * tangent);
+        
+        array_add(*result.positions, p2 + offset); // top circle vertex
+        array_add(*result.positions, p1 + offset); // bottom circle vertex
+    }
+    
+    segments_2 := segments * 2;
+    
+    // indices for the top face
+    for i: 0..segments-1 {
+        array_add(*result.indices, 0);
+        array_add(*result.indices, cast(u32)(2 + i * 2));
+        array_add(*result.indices, cast(u32)(2 + ((i * 2 + 2) % segments_2)));
+    }
+    
+    // indices for the bottom face
+    for i: 0..segments-1 {
+        array_add(*result.indices, 1);
+        array_add(*result.indices, cast(u32)(3 + ((i * 2) % segments_2)));
+        array_add(*result.indices, cast(u32)(3 + ((i * 2 + 2) % segments_2)));
+    }
+    
+    // indices for the side faces
+    for i: 0..segments-1 {
+        top1    := cast(u32)(2 + (i * 2));
+        bottom1 := cast(u32)(3 + (i * 2));
+        top2    := cast(u32)(2 + ((i * 2 + 2) % segments_2));
+        bottom2 := cast(u32)(3 + ((i * 2 + 2) % segments_2));
+        
+        array_add(*result.indices, top1);
+        array_add(*result.indices, bottom1);
+        array_add(*result.indices, top2);
+        
+        array_add(*result.indices, top2);
+        array_add(*result.indices, bottom1);
+        array_add(*result.indices, bottom2);
+    }
+    
+    return result;
+}
