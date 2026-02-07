@@ -24,6 +24,7 @@ Indexed_Mesh :: struct {
     normals             : [..] Vector3; 
     texture_coordinates : [..] Vector2; 
     rgb_colors          : [..] Vector3; 
+    name: string;
 }
 
 create_itpc_with_color :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
@@ -52,7 +53,7 @@ create_itpc_with_color_variation :: (itp : Indexed_Triangle_Positions, color: Ve
 }
 
 
-generate_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, outer_radius: float, num_segments: int) -> Indexed_Triangle_Positions {
+create_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, outer_radius: float, num_segments: int) -> Indexed_Triangle_Positions {
     annulus : Indexed_Triangle_Positions;
 
     angle_step_turns :float = full_turn / num_segments;
