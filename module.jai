@@ -11,6 +11,24 @@ Indexed_Triangle_Positions :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
 }
+translate :: (itp: *Indexed_Triangle_Positions, offset: Vector3) {
+    for *pos : itp.positions {
+        pos.* += offset;
+    }
+}
+
+translate_copy :: (itp: Indexed_Triangle_Positions, offset: Vector3) -> Indexed_Triangle_Positions {
+    result : Indexed_Triangle_Positions;
+    
+    array_copy(*result.indices, itp.indices);
+    array_copy(*result.positions, itp.positions);
+    
+    for *pos : result.positions {
+        pos.* += offset;
+    }
+    
+    return result;
+}
 
 Indexed_Triangle_Positions_Colors :: struct {
     indices : [..] u32; 
