@@ -54,18 +54,27 @@ create_itpc_with_color :: (itp : Indexed_Triangle_Positions, color: Vector3) -> 
     return itpc;
 }
 
-create_itpc_with_color_variation :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
+random_get_vector_zero_to_one :: () -> Vector3 {
+    return .{random_get_zero_to_one(), random_get_zero_to_one(), random_get_zero_to_one()};
+}
+
+create_itpc_with_color_variation :: (itp : Indexed_Triangle_Positions, color: Vector3 = NEGATIVE_ONE3, max_color_change :float = 0.2) -> Indexed_Triangle_Positions_Colors {
+
     itpc : Indexed_Triangle_Positions_Colors;
     for itp.indices array_add(*itpc.indices, it);
     for itp.positions array_add(*itpc.positions, it);
     array_reserve(*itpc.rgb_colors, itpc.positions.count); 
+
+    base_color := color;
+    if color == -ONE3 base_color = random_get_vector_zero_to_one();
+
     for 1..itpc.positions.count {
-        scale := 1.0;
-        r1 := random_get_zero_to_one();
-        r2 := random_get_zero_to_one();
-        r3 := random_get_zero_to_one();
-        random_color_offset := Vector3.{r1, r2, r3} * scale ;
-        array_add(*itpc.rgb_colors, color + random_color_offset);  
+
+        // [-.5, .5] * 2 = [-1, 1] * scale = [-max_color_change, max_color_change];
+        color_change := (random_get_vector_zero_to_one() - ONE3 * .5) * max_color_change;
+        new_color := saturate(base_color + color_change);
+
+        array_add(*itpc.rgb_colors, new_color);  
     }
     return itpc;
 }
@@ -106,7 +115,7 @@ create_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, outer_
     return annulus;
 }
 
-generate_box :: (origin : Vector3, size_x : float, size_y : float, size_z : float) -> Indexed_Triangle_Positions {
+create_box :: (origin : Vector3 = .{0, 0, 0}, size_x : float = 1, size_y : float = 1, size_z : float = 1) -> Indexed_Triangle_Positions {
     box : Indexed_Triangle_Positions;
 
     half_x := size_x / 2;
