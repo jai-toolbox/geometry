@@ -36,13 +36,35 @@ Indexed_Triangle_Positions_Colors :: struct {
     rgb_colors : [..] Vector3; 
 }
 
+
+/*
+
+diffuse: to spread out in all directions
+
+When light hits a surface, some of it bounces off directly (specular reflection)
+and some penetrates the surface. The light that enters gets partially absorbed
+and partially scattered back out in all directions — this is diffuse reflection.
+
+The color we perceive is the light that was NOT absorbed during this process.
+A white object absorbs very little; a red object absorbs most wavelengths
+except red.
+
+Most objects don't have a uniform diffuse value — it varies across the surface,
+which is why we use diffuse maps (also called "base color" maps.
+
+Note: call this albedo is wrong, learn about the definition of abledo, it is a value between 0-1 which is given to an entire object based on how it reflects light.
+
+*/
+
+
 Indexed_Mesh :: struct {
+    name: string;
     indices             : [..] u32; 
     positions           : [..] Vector3; 
     normals             : [..] Vector3; 
     texture_coordinates : [..] Vector2; 
     rgb_colors          : [..] Vector3; 
-    name: string;
+    diffuse_map_path    : string; 
 }
 
 create_itpc_with_color :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
