@@ -249,3 +249,96 @@ create_cylinder_between :: (p1: Vector3, p2: Vector3, segments: int, radius: flo
     
     return result;
 }
+
+/*
+ Create the points of an arrow pointing from one point to another
+
+                                                g\
+                                                | --\
+                                                |    ---\
+           |    a-------------------------------c        --\
+ stem      |    |                    -------/   |           --\
+ thickness |  start          -------/           |           -----end
+           |    |    -------/                   |           --/
+           |    b---/---------------------------d        --/
+                                                |    ---/
+                                                | --/
+                                                f/
+
+                                                ------tip len-------
+
+ returns [a, b, c, d, e, f, g] from this we want to produce indices
+
+ {a, b, c}, {c, b, d}, {e, f, g}
+ {0, 1, 2}, {2, 1, 3}, {4, 5, 6}
+
+ */
+create_2d_arrow :: (start: Vector2, end: Vector2, stem_thickness: float, tip_fraction: float = 0.2) -> Indexed_Triangle_Positions {
+    result: Indexed_Triangle_Positions;
+
+    half_thickness := stem_thickness / 2.0;
+
+    start_to_end := end - start;
+    end_to_start := start - end;
+
+    total_length := length(start_to_end);
+    tip_length := tip_fraction * total_length;
+
+    stem_length := max(0.0, total_length - tip_length);
+
+    start_to_end_normalized := unit_vector(start_to_end);
+    end_to_start_normalized := unit_vector(end_to_start);
+
+    // note that these two are also normalized
+    start_to_a_dir := Vector2.{-start_to_end_normalized.y, start_to_end_normalized.x};
+    start_to_b_dir := Vector2.{start_to_end_normalized.y, -start_to_end_normalized.x};
+
+    a := start + start_to_a_dir * half_thickness;
+    b := start + start_to_b_dir * half_thickness;
+    c := a + start_to_end_normalized * stem_length;
+    d := b + start_to_end_normalized * stem_length;
+
+    /*
+     *
+     *         (aln)--        |
+     *               ----     |
+     *                  ----  |
+     *         (e2s)----------s-------------e
+     *                  ----  |
+     *               ----     |
+     *         (bln)--        |
+     *
+     *         ------len 1-----
+     */
+
+    a_line := end_to_start_normalized + start_to_a_dir;
+    b_line := end_to_start_normalized + start_to_b_dir;
+
+    /*
+     *       |o
+     *       |    o    hyp = \sqrt{2} x
+     *       x        o
+     *       |            o
+     *       |------x------- o
+     */
+
+    a_line = unit_vector(a_line) * sqrt(2.0) * tip_length;
+    b_line = unit_vector(b_line) * sqrt(2.0) * tip_length;
+
+    g := end + a_line;
+    f := end + b_line;
+
+    // positions
+    array_add(*result.positions, Vector3.{a.x, a.y, 0.0});     // 0
+    array_add(*result.positions, Vector3.{b.x, b.y, 0.0});     // 1
+    array_add(*result.positions, Vector3.{c.x, c.y, 0.0});     // 2
+    array_add(*result.positions, Vector3.{d.x, d.y, 0.0});     // 3
+    array_add(*result.positions, Vector3.{end.x, end.y, 0.0}); // 4
+    array_add(*result.positions, Vector3.{f.x, f.y, 0.0});     // 5
+    array_add(*result.positions, Vector3.{g.x, g.y, 0.0});     // 6
+
+    // indices: {a, b, c}, {c, b, d}, {e, f, g} => {0, 1, 2}, {2, 1, 3}, {4, 5, 6}
+    for u32.[0, 1, 2, 2, 1, 3, 4, 5, 6] array_add(*result.indices, it);
+
+    return result;
+}
