@@ -30,10 +30,20 @@ translate_copy :: (itp: Indexed_Triangle_Positions, offset: Vector3) -> Indexed_
     return result;
 }
 
+
+
 Indexed_Triangle_Positions_Colors :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
     rgb_colors : [..] Vector3; 
+}
+
+merge :: (dest: *Indexed_Triangle_Positions_Colors, source: Indexed_Triangle_Positions_Colors) {
+    base_idx := cast(u32) dest.positions.count;
+    
+    for source.positions  array_add(*dest.positions, it);
+    for source.rgb_colors array_add(*dest.rgb_colors, it);
+    for source.indices    array_add(*dest.indices, it + base_idx);
 }
 
 
@@ -341,4 +351,119 @@ create_2d_arrow :: (start: Vector2, end: Vector2, stem_thickness: float, tip_fra
     for u32.[0, 1, 2, 2, 1, 3, 4, 5, 6] array_add(*result.indices, it);
 
     return result;
+}
+
+/*
+
+This function creates a graph, it takes a bunch of 2d points like this:
+
+|                    .
+|           .         
+|                     
+|     .        .      
+|  .                  
+|        .        .   
+|                     
+|.............................
+
+this function takes the aobve graph and "supports it from below" with rectangles:
+
+|                    .
+|           .        |
+|           |        |
+|     .     |...     |
+|  ...|     |  |     |
+|  |  |.....|  |.....|
+|  |  |  |  |  |  |  |
+|.............................
+
+note: the rectangle height is always the min height of the two sequential points.
+
+The function then adds triangles on top of each rectangle to connect the points linearly. "thickening it up".
+
+*/
+create_graph :: (points: [] Vector2, origin: Vector2 = .{0, 0}, scale: Vector2 = .{1, 1}) -> Indexed_Triangle_Positions {
+    result: Indexed_Triangle_Positions;
+    
+    if points.count < 2 return result;
+    
+    for i: 0..points.count-2 {
+        p1 := points[i];
+        p2 := points[i + 1];
+        
+        x1 := origin.x + p1.x * scale.x;
+        y1 := origin.y + p1.y * scale.y;
+        x2 := origin.x + p2.x * scale.x;
+        y2 := origin.y + p2.y * scale.y;
+        y0 := origin.y;
+        
+        y_min := min(y1, y2);
+        
+        base_idx := cast(u32) result.positions.count;
+        
+        v_tl := Vector3.{x1, y_min, 0};  // base_idx + 0
+        v_tr := Vector3.{x2, y_min, 0};  // base_idx + 1
+        v_bl := Vector3.{x1, y0,    0};  // base_idx + 2
+        v_br := Vector3.{x2, y0,    0};  // base_idx + 3
+        v_p1 := Vector3.{x1, y1,    0};  // base_idx + 4
+        v_p2 := Vector3.{x2, y2,    0};  // base_idx + 5
+        
+        array_add(*result.positions, v_tl);
+        array_add(*result.positions, v_tr);
+        array_add(*result.positions, v_bl);
+        array_add(*result.positions, v_br);
+        array_add(*result.positions, v_p1);
+        array_add(*result.positions, v_p2);
+        
+        // Rectangle: tl, bl, br, tr
+        array_add(*result.indices, base_idx + 0);
+        array_add(*result.indices, base_idx + 2);
+        array_add(*result.indices, base_idx + 3);
+        
+        array_add(*result.indices, base_idx + 0);
+        array_add(*result.indices, base_idx + 3);
+        array_add(*result.indices, base_idx + 1);
+        
+        /*
+         right-angle triangle on top of the rectangle
+
+         when y1 > y2 (decreasing): triangle is p1(x1,y1), tl(x1,y_min), tr(x2,y_min)
+           right angle at tl = (x1, y_min) = (x1, y2)
+
+         when y2 > y1 (increasing): triangle is tl(x1,y_min), tr(x2,y_min), p2(x2,y2)
+           right angle at tr = (x2, y_min) = (x2, y1)
+
+         when y1 == y2: triangle is degenerate (zero area), harmless
+        */
+        
+        array_add(*result.indices, base_idx + 4); // p1
+        array_add(*result.indices, base_idx + 0); // tl
+        array_add(*result.indices, base_idx + 1); // tr
+        
+        array_add(*result.indices, base_idx + 1); // tr
+        array_add(*result.indices, base_idx + 5); // p2
+        array_add(*result.indices, base_idx + 4); // p1
+    }
+    
+    return result;
+}
+
+
+create_quad :: (x0: float, y0: float, x1: float, y1: float, z: float = 0.0) -> Indexed_Triangle_Positions {
+    itp: Indexed_Triangle_Positions;
+    
+    array_add(*itp.positions, Vector3.{x0, y0, z});
+    array_add(*itp.positions, Vector3.{x1, y0, z});
+    array_add(*itp.positions, Vector3.{x1, y1, z});
+    array_add(*itp.positions, Vector3.{x0, y1, z});
+    
+    array_add(*itp.indices, 0);
+    array_add(*itp.indices, 1);
+    array_add(*itp.indices, 2);
+    
+    array_add(*itp.indices, 0);
+    array_add(*itp.indices, 2);
+    array_add(*itp.indices, 3);
+    
+    return itp;
 }
