@@ -467,3 +467,8 @@ create_quad :: (x0: float, y0: float, x1: float, y1: float, z: float = 0.0) -> I
     
     return itp;
 }
+
+#load "bezier_triangle.jai";
+#load "biquadratic_bezier_patch.jai";
+
+
