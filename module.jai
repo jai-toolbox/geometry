@@ -7,10 +7,18 @@
 #import "tbx/math";
 
 
+
 Indexed_Triangle_Positions :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
 }
+
+Indexed_Triangle_Position_Normals :: struct {
+    indices : [..] u32; 
+    positions : [..] Vector3; 
+    normals : [..] Vector3; 
+}
+
 translate :: (itp: *Indexed_Triangle_Positions, offset: Vector3) {
     for *pos : itp.positions {
         pos.* += offset;
@@ -470,5 +478,6 @@ create_quad :: (x0: float, y0: float, x1: float, y1: float, z: float = 0.0) -> I
 
 #load "bezier_triangle.jai";
 #load "biquadratic_bezier_patch.jai";
+#load "adjacency_mesh.jai";
 
 
