@@ -204,6 +204,20 @@ face_normal :: (face: *Face) -> Vector3 {
 extrude_face :: (mesh: *Adjacency_Mesh, face: *Face, offset: float) {
     normal := face_normal(face);
 
+    // determine if this face is entirely on the boundary
+    is_boundary_face := true;
+    {
+        edge := face.arbitrary_edge;
+        while true {
+            if edge.same_edge_other_face != null {
+                is_boundary_face = false;
+                break;
+            }
+            edge = edge.next_edge_around_face;
+            if edge == face.arbitrary_edge break;
+        }
+    }
+
     Boundary_Info :: struct {
         edge:       *Edge;
         old_vertex: *Vertex;
@@ -223,9 +237,92 @@ extrude_face :: (mesh: *Adjacency_Mesh, face: *Face, offset: float) {
 
     n := boundary.count;
 
+    if is_boundary_face {
+        for 0..n-1 {
+            j := (it + 1) % n;
+            make_face_from_vertices(mesh, .[
+                boundary[it].old_vertex,
+                boundary[j].old_vertex,
+                boundary[j].new_vertex,
+                boundary[it].new_vertex
+            ]);
+        }
+
+        top_verts: [..] *Vertex;
+        top_verts.allocator = temp;
+        for 0..n-1 {
+            array_add(*top_verts, boundary[it].new_vertex);
+        }
+        make_face_from_vertices(mesh, top_verts);
+
+    } else {
+        for 0..n-1 {
+            j := (it + 1) % n;
+            make_face_from_vertices(mesh, .[
+                boundary[it].old_vertex,
+                boundary[j].old_vertex,
+                boundary[j].new_vertex,
+                boundary[it].new_vertex
+            ]);
+        }
+
+        for 0..n-1 {
+            boundary[it].edge.start_vertex = boundary[it].new_vertex;
+            boundary[it].new_vertex.arbitrary_outgoing_edge = boundary[it].edge;
+        }
+    }
+
+    for mesh.edges {
+        it.same_edge_other_face = null;
+    }
+    link_shared_edges(mesh);
+}
+
+inset_face :: (mesh: *Adjacency_Mesh, face: *Face, inset_amount: float) {
+    normal := face_normal(face);
+
+    // collect boundary info: the edges and vertices of the original face
+    Boundary_Info :: struct {
+        edge:       *Edge;
+        old_vertex: *Vertex;
+        new_vertex: *Vertex;
+    }
+
+    boundary: [..] Boundary_Info;
+    defer array_reset(*boundary);
+
+    centroid := Vector3.{0, 0, 0};
+    vert_count := 0;
+    {
+        edge := face.arbitrary_edge;
+        while true {
+            centroid += edge.start_vertex.position;
+            vert_count += 1;
+            edge = edge.next_edge_around_face;
+            if edge == face.arbitrary_edge break;
+        }
+    }
+    centroid = centroid * (1.0 / cast(float) vert_count);
+
+    // create new inset vertices (moved toward centroid by inset_amount, clamped 0..1)
+    t := clamp(inset_amount, 0.0, 1.0);
+    {
+        edge := face.arbitrary_edge;
+        while true {
+            inset_pos := edge.start_vertex.position + (centroid - edge.start_vertex.position) * t;
+            new_v := make_vertex(mesh, inset_pos);
+            array_add(*boundary, .{edge, edge.start_vertex, new_v});
+            edge = edge.next_edge_around_face;
+            if edge == face.arbitrary_edge break;
+        }
+    }
+
+    n := boundary.count;
+
+    // create connecting quads between outer and inner vertices.
+    // each quad connects: old[i] -> old[i+1] -> new[i+1] -> new[i]
     for 0..n-1 {
         j := (it + 1) % n;
-
         make_face_from_vertices(mesh, .[
             boundary[it].old_vertex,
             boundary[j].old_vertex,
@@ -234,11 +331,14 @@ extrude_face :: (mesh: *Adjacency_Mesh, face: *Face, offset: float) {
         ]);
     }
 
+    // reassign the original face's edges to use the new (inset) vertices.
+    // this makes the original face become the inner face.
     for 0..n-1 {
         boundary[it].edge.start_vertex = boundary[it].new_vertex;
         boundary[it].new_vertex.arbitrary_outgoing_edge = boundary[it].edge;
     }
 
+    // re-link all twin pointers
     for mesh.edges {
         it.same_edge_other_face = null;
     }
@@ -388,7 +488,7 @@ make_itp_from_adjacency_mesh :: (adj: *Adjacency_Mesh) -> Indexed_Triangle_Posit
             if edge == it.arbitrary_edge break;
         }
 
-        // fan triangulation for n-gons
+        // fan triangulation for n-gons, could make this a parameter later.
         for 1..face_indices.count - 2 {
             array_add(*result.indices, face_indices[0]);
             array_add(*result.indices, face_indices[it]);
