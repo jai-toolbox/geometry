@@ -71,28 +71,28 @@ A 5 by 5 grid has 2 * 2 = 4 patches:
 
 */
 
-Bezier_Patch_Grid :: struct {
+Bezier_Patch_Grid :: struct (T: Type) {
     width:  int;
     height: int;
-    control_points: [..] Vector3;  // stored row-major: index = row * width + col
+    control_points: [..] T;  // stored row-major: index = row * width + col
 }
 
-init_bezier_patch_grid :: (grid: *Bezier_Patch_Grid, width: int, height: int) {
+init_bezier_patch_grid :: (grid: *Bezier_Patch_Grid($T), width: int, height: int) {
     grid.width = width;
     grid.height = height;
     array_resize(*grid.control_points, width * height);
 }
 
-get_grid_control_point :: (grid: *Bezier_Patch_Grid, row: int, col: int) -> Vector3 {
+get_grid_control_point :: (grid: *Bezier_Patch_Grid($T), row: int, col: int) -> T {
     return grid.control_points[row * grid.width + col];
 }
 
-set_grid_control_point :: (grid: *Bezier_Patch_Grid, row: int, col: int, value: Vector3) {
+set_grid_control_point :: (grid: *Bezier_Patch_Grid($T), row: int, col: int, value: T) {
     grid.control_points[row * grid.width + col] = value;
 }
 
 // evaluates a single quadratic Bezier curve: Q(a, b, c, t) = (1-t)^2 * a + 2*(1-t)*t * b + t^2 * c
-evaluate_quadratic_bezier :: (a: Vector3, b: Vector3, c: Vector3, t: float) -> Vector3 {
+evaluate_quadratic_bezier :: (a: $T, b: T, c: T, t: float) -> T {
     one_minus_t := 1.0 - t;
     return one_minus_t * one_minus_t * a + 2.0 * one_minus_t * t * b + t * t * c;
 }
@@ -102,7 +102,7 @@ evaluates a single biquadratic Bezier patch given its 3x3 control points at para
 where s runs along rows and t runs along columns, both in [0, 1]
 patch_controls is a 3x3 array stored row-major (9 elements)
 */
-evaluate_biquadratic_patch :: (patch_controls: [] Vector3, s: float, t: float) -> Vector3 {
+evaluate_biquadratic_patch :: (patch_controls: [] $T, s: float, t: float) -> T {
 
     // evaluate along columns for each row
     temp0 := evaluate_quadratic_bezier(patch_controls[0], patch_controls[1], patch_controls[2], t);
@@ -124,20 +124,25 @@ patch_controls: the 3x3 control points in row-major order.
 
 */
 
-tessellate_biquadratic_patch :: (patch_controls: [] Vector3, resolution: int) -> Indexed_Triangle_Positions {
-    result: Indexed_Triangle_Positions;
+Tessellated_Patch_Result :: struct (T: Type) {
+    values:  [..] T;
+    indices: [..] u32;
+}
+
+tessellate_biquadratic_patch :: (patch_controls: [] $T, resolution: int) -> Tessellated_Patch_Result(T) {
+    result: Tessellated_Patch_Result(T);
 
     n := resolution;
     inv_n := 1.0 / cast(float) n;
     verts_per_side := n + 1;
 
-    // evaluate surface positions on a regular grid
+    // evaluate surface values on a regular grid
     for row: 0..n {
         s := cast(float) row * inv_n;
         for col: 0..n {
             t := cast(float) col * inv_n;
-            pos := evaluate_biquadratic_patch(patch_controls, s, t);
-            array_add(*result.positions, pos);
+            val := evaluate_biquadratic_patch(patch_controls, s, t);
+            array_add(*result.values, val);
         }
     }
 
@@ -180,8 +185,8 @@ been written yet.
 
 */
 
-create_bezier_patch_grid :: (grid: *Bezier_Patch_Grid, resolution: int) -> Indexed_Triangle_Positions {
-    result: Indexed_Triangle_Positions;
+create_bezier_patch_grid :: (grid: *Bezier_Patch_Grid($T), resolution: int) -> Tessellated_Patch_Result(T) {
+    result: Tessellated_Patch_Result(T);
 
     num_patches_x := (grid.width  - 1) / 2;
     num_patches_y := (grid.height - 1) / 2;
@@ -196,7 +201,7 @@ create_bezier_patch_grid :: (grid: *Bezier_Patch_Grid, resolution: int) -> Index
     total_verts_y := num_patches_y * n + 1;
     total_verts   := total_verts_x * total_verts_y;
 
-    array_resize(*result.positions, total_verts);
+    array_resize(*result.values, total_verts);
 
     // we use a flag array to avoid writing the same vertex twice (shared edges)
     written: [..] bool;
@@ -212,7 +217,7 @@ create_bezier_patch_grid :: (grid: *Bezier_Patch_Grid, resolution: int) -> Index
             gj := 2 * px;  // col in control point grid
 
             // extract the 3x3 control points for this patch (row-major)
-            patch_controls: [9] Vector3;
+            patch_controls: [9] T;
             for r: 0..2 {
                 for c: 0..2 {
                     patch_controls[r * 3 + c] = get_grid_control_point(grid, gi + r, gj + c);
@@ -234,8 +239,8 @@ create_bezier_patch_grid :: (grid: *Bezier_Patch_Grid, resolution: int) -> Index
                     global_idx := vy * total_verts_x + vx;
 
                     if !written[global_idx] {
-                        pos := evaluate_biquadratic_patch(patch_controls, s, t);
-                        result.positions[global_idx] = pos;
+                        val := evaluate_biquadratic_patch(patch_controls, s, t);
+                        result.values[global_idx] = val;
                         written[global_idx] = true;
                     }
                 }
