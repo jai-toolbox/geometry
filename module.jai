@@ -46,6 +46,12 @@ Indexed_Triangle_Positions_Colors :: struct {
     rgb_colors : [..] Vector3; 
 }
 
+Indexed_Triangle_Positions_Color_Alphas :: struct {
+    indices : [..] u32; 
+    positions : [..] Vector3; 
+    rgba_colors : [..] Vector4; 
+}
+
 merge :: (dest: *Indexed_Triangle_Positions_Colors, source: Indexed_Triangle_Positions_Colors) {
     base_idx := cast(u32) dest.positions.count;
     
@@ -91,6 +97,15 @@ create_itpc_with_color :: (itp : Indexed_Triangle_Positions, color: Vector3) -> 
     for itp.positions array_add(*itpc.positions, it);
     array_reserve(*itpc.rgb_colors, itpc.positions.count); 
     for 1..itpc.positions.count array_add(*itpc.rgb_colors, color);  
+    return itpc;
+}
+
+create_itpca_with_color_alpha :: (itp : Indexed_Triangle_Positions, color_alpha: Vector4) -> Indexed_Triangle_Positions_Color_Alphas {
+    itpc : Indexed_Triangle_Positions_Color_Alphas;
+    for itp.indices array_add(*itpc.indices, it);
+    for itp.positions array_add(*itpc.positions, it);
+    array_reserve(*itpc.rgba_colors, itpc.positions.count); 
+    for 1..itpc.positions.count array_add(*itpc.rgba_colors, color_alpha);  
     return itpc;
 }
 
@@ -153,6 +168,10 @@ create_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, outer_
     }
 
     return annulus;
+}
+
+create_cube :: (origin: Vector3 = .{0, 0, 0}, side_length: float) -> Indexed_Triangle_Positions {
+    return create_box(origin, side_length, side_length, side_length);
 }
 
 create_box :: (origin : Vector3 = .{0, 0, 0}, size_x : float = 1, size_y : float = 1, size_z : float = 1) -> Indexed_Triangle_Positions {
@@ -457,7 +476,7 @@ create_graph :: (points: [] Vector2, origin: Vector2 = .{0, 0}, scale: Vector2 =
 }
 
 
-create_quad :: (x0: float, y0: float, x1: float, y1: float, z: float = 0.0) -> Indexed_Triangle_Positions {
+create_quad :: (x0: float = -1.0, y0: float = -1.0, x1: float = 1.0, y1: float = 1.0, z: float = 0.0) -> Indexed_Triangle_Positions {
     itp: Indexed_Triangle_Positions;
     
     array_add(*itp.positions, Vector3.{x0, y0, z});
