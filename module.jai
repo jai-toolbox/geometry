@@ -5,18 +5,28 @@
 #import "tbx/turns";
 #import "tbx/linear_algebra";
 #import "tbx/math";
-
-
+#import "tbx/rectangle";
 
 Indexed_Triangle_Positions :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
 }
 
+deinit :: (using itp: *Indexed_Triangle_Positions) {
+    array_free(indices);
+    array_free(positions);
+}
+
 Indexed_Triangle_Position_Normals :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
     normals : [..] Vector3; 
+}
+
+deinit :: (using itpn: *Indexed_Triangle_Position_Normals) {
+    array_free(indices);
+    array_free(positions);
+    array_free(normals);
 }
 
 translate :: (itp: *Indexed_Triangle_Positions, offset: Vector3) {
@@ -132,6 +142,29 @@ create_itpc_with_color_variation :: (itp : Indexed_Triangle_Positions, color: Ve
         array_add(*itpc.rgb_colors, new_color);  
     }
     return itpc;
+}
+
+create_rectangle :: (center: Vector3, center_to_edge_a: Vector3, center_to_edge_b: Vector3) -> Indexed_Triangle_Positions {
+    rect : Indexed_Triangle_Positions;
+
+    assert(abs(cos_of_angle_between(center_to_edge_a, center_to_edge_b)) < 0.0001, "center_to_edge_a and center_to_edge_b must be perpendicular");
+
+    array_add(*rect.positions, center - center_to_edge_a - center_to_edge_b);
+    array_add(*rect.positions, center + center_to_edge_a - center_to_edge_b);
+    array_add(*rect.positions, center + center_to_edge_a + center_to_edge_b);
+    array_add(*rect.positions, center - center_to_edge_a + center_to_edge_b);
+
+    // triangle 1
+    array_add(*rect.indices, cast(u32) 0);
+    array_add(*rect.indices, cast(u32) 1);
+    array_add(*rect.indices, cast(u32) 2);
+
+    // triangle 2
+    array_add(*rect.indices, cast(u32) 0);
+    array_add(*rect.indices, cast(u32) 2);
+    array_add(*rect.indices, cast(u32) 3);
+
+    return rect;
 }
 
 
@@ -475,6 +508,17 @@ create_graph :: (points: [] Vector2, origin: Vector2 = .{0, 0}, scale: Vector2 =
     return result;
 }
 
+rectangle_to_itp :: (rectangle: Rectangle, z: float = 0.0) -> Indexed_Triangle_Positions {
+    half_w := rectangle.w / 2.0;
+    half_h := rectangle.h / 2.0;
+
+    x0 := rectangle.x - half_w;
+    y0 := rectangle.y - half_h;
+    x1 := rectangle.x + half_w;
+    y1 := rectangle.y + half_h;
+
+    return create_quad(x0, y0, x1, y1, z);
+}
 
 create_quad :: (x0: float = -1.0, y0: float = -1.0, x1: float = 1.0, y1: float = 1.0, z: float = 0.0) -> Indexed_Triangle_Positions {
     itp: Indexed_Triangle_Positions;
@@ -494,6 +538,59 @@ create_quad :: (x0: float = -1.0, y0: float = -1.0, x1: float = 1.0, y1: float =
     
     return itp;
 }
+
+
+create_star :: (center_x: float, center_y: float, outer_radius: float, inner_radius: float, num_star_tips: int, blunt_tips: bool = false) -> Indexed_Triangle_Positions {
+    result: Indexed_Triangle_Positions;
+
+    star_multiplier := ifx blunt_tips then 3 else 2;
+    num_vertices := star_multiplier * num_star_tips;
+
+    inner_radius_offset := 1;
+
+    full_rotation := cast(float)(2.0 * PI);
+    angle_step := full_rotation / cast(float) num_vertices;
+
+    // make sure that a tip always faces directly up
+    initial_angle := full_rotation / 4.0;
+
+    // align the flat part of the blunt tip so that it points vertically
+    if blunt_tips {
+        initial_angle -= angle_step / 2.0;
+    }
+
+    // generate vertices
+    for i: 0..num_vertices - 1 {
+        angle := initial_angle + cast(float) i * angle_step;
+
+        radius: float;
+        if (i + inner_radius_offset) % star_multiplier == 0 {
+            radius = inner_radius;
+        } else {
+            radius = outer_radius;
+        }
+
+        array_add(*result.positions, Vector3.{
+            center_x + radius * cos(angle),
+            center_y + radius * sin(angle),
+            0.0,
+        });
+    }
+
+    // the center vertex is required to form triangles and is stored at the very end
+    array_add(*result.positions, Vector3.{center_x, center_y, 0.0});
+
+    // generate indices — triangle fan from center
+    for i: 0..num_vertices - 1 {
+        next := (i + 1) % num_vertices;
+        array_add(*result.indices, cast(u32) i);
+        array_add(*result.indices, cast(u32) next);
+        array_add(*result.indices, cast(u32) num_vertices); // center index
+    }
+
+    return result;
+}
+
 
 #load "bezier_triangle.jai";
 #load "biquadratic_bezier_patch.jai";
