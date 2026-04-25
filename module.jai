@@ -17,6 +17,13 @@ deinit :: (using itp: *Indexed_Triangle_Positions) {
     array_free(positions);
 }
 
+merge :: (dest: *Indexed_Triangle_Positions, source: Indexed_Triangle_Positions) {
+    base_idx := cast(u32) dest.positions.count;
+    
+    for source.positions  array_add(*dest.positions, it);
+    for source.indices    array_add(*dest.indices, it + base_idx);
+}
+
 Indexed_Triangle_Position_Normals :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
@@ -54,6 +61,12 @@ Indexed_Triangle_Positions_Colors :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
     rgb_colors : [..] Vector3; 
+}
+
+deinit :: (using itpc: *Indexed_Triangle_Positions_Colors) {
+    array_free(indices);
+    array_free(positions);
+    array_free(rgb_colors);
 }
 
 Indexed_Triangle_Positions_Color_Alphas :: struct {
@@ -123,6 +136,7 @@ random_get_vector_zero_to_one :: () -> Vector3 {
     return .{random_get_zero_to_one(), random_get_zero_to_one(), random_get_zero_to_one()};
 }
 
+// this function copies the data
 create_itpc_with_color_variation :: (itp : Indexed_Triangle_Positions, color: Vector3 = NEGATIVE_ONE3, max_color_change :float = 0.2) -> Indexed_Triangle_Positions_Colors {
 
     itpc : Indexed_Triangle_Positions_Colors;
@@ -167,11 +181,41 @@ create_rectangle :: (center: Vector3, center_to_edge_a: Vector3, center_to_edge_
     return rect;
 }
 
+create_circle :: (center: Vector3, normal: Vector3, radius: float, num_segments: int) -> Indexed_Triangle_Positions {
+    circle : Indexed_Triangle_Positions;
+
+    angle_step_turns : float = FULL_TURN / num_segments;
+
+    u, v: Vector3;
+    u = arbitrary_unit_perpendicular(normal);
+    v = normalized_cross(normal, u);
+
+    // center vertex at index 0
+    array_add(*circle.positions, center);
+
+    for 0..num_segments-1 {
+        t := it * angle_step_turns;
+        dir := angle_to_unit_vector(t, u, v);
+        array_add(*circle.positions, center + dir * radius);
+    }
+
+    // triangle fan from center
+    for 0..num_segments-1 {
+        next := (it + 1) % num_segments;
+
+        array_add(*circle.indices, 0);                      // center
+        array_add(*circle.indices, cast(u32)(1 + it));      // current
+        array_add(*circle.indices, cast(u32)(1 + next));    // next
+    }
+
+    return circle;
+}
+
 
 create_annulus :: (center: Vector3, normal: Vector3, inner_radius: float, outer_radius: float, num_segments: int) -> Indexed_Triangle_Positions {
     annulus : Indexed_Triangle_Positions;
 
-    angle_step_turns :float = full_turn / num_segments;
+    angle_step_turns :float = FULL_TURN / num_segments;
 
     u, v: Vector3;
     u = arbitrary_unit_perpendicular(normal);
