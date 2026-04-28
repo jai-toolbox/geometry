@@ -114,21 +114,41 @@ Indexed_Mesh :: struct {
     diffuse_map_path    : string; 
 }
 
-create_itpc_with_color :: (itp : Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
-    itpc : Indexed_Triangle_Positions_Colors;
-    for itp.indices array_add(*itpc.indices, it);
-    for itp.positions array_add(*itpc.positions, it);
-    array_reserve(*itpc.rgb_colors, itpc.positions.count); 
-    for 1..itpc.positions.count array_add(*itpc.rgb_colors, color);  
+
+create_itpc_with_color :: (itp: Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
+    itpc: Indexed_Triangle_Positions_Colors;
+    itpc.indices = itp.indices;
+    itpc.positions = itp.positions;
+    array_reserve(*itpc.rgb_colors, itpc.positions.count);
+    for 1..itpc.positions.count  array_add(*itpc.rgb_colors, color);
+    return itpc;
+}
+
+// do we ever even need the copy functions here?, maybe we can just remove them
+create_itpc_with_color_copy :: (itp: Indexed_Triangle_Positions, color: Vector3) -> Indexed_Triangle_Positions_Colors {
+    itpc: Indexed_Triangle_Positions_Colors;
+    array_copy(*itpc.indices, itp.indices);
+    array_copy(*itpc.positions, itp.positions);
+    array_reserve(*itpc.rgb_colors, itpc.positions.count);
+    for 1..itpc.positions.count array_add(*itpc.rgb_colors, color);
     return itpc;
 }
 
 create_itpca_with_color_alpha :: (itp : Indexed_Triangle_Positions, color_alpha: Vector4) -> Indexed_Triangle_Positions_Color_Alphas {
     itpc : Indexed_Triangle_Positions_Color_Alphas;
-    for itp.indices array_add(*itpc.indices, it);
-    for itp.positions array_add(*itpc.positions, it);
-    array_reserve(*itpc.rgba_colors, itpc.positions.count); 
-    for 1..itpc.positions.count array_add(*itpc.rgba_colors, color_alpha);  
+    itpc.indices = itp.indices;
+    itpc.positions = itp.positions;
+    array_reserve(*itpc.rgba_colors, itpc.positions.count);
+    for 1..itpc.positions.count array_add(*itpc.rgba_colors, color_alpha);
+    return itpc;
+}
+
+create_itpca_with_color_alpha_copy :: (itp : Indexed_Triangle_Positions, color_alpha: Vector4) -> Indexed_Triangle_Positions_Color_Alphas {
+    itpc : Indexed_Triangle_Positions_Color_Alphas;
+    array_copy(itpc.indices, itp.indices);
+    array_copy(itpc.positions, itp.positions);
+    array_reserve(*itpc.rgba_colors, itpc.positions.count);
+    for 1..itpc.positions.count array_add(*itpc.rgba_colors, color_alpha);
     return itpc;
 }
 
