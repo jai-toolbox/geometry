@@ -75,6 +75,14 @@ Indexed_Triangle_Positions_Color_Alphas :: struct {
     rgba_colors : [..] Vector4; 
 }
 
+merge :: (dest: *Indexed_Triangle_Positions_Color_Alphas, source: Indexed_Triangle_Positions_Color_Alphas) {
+    base_idx := cast(u32) dest.positions.count;
+    
+    for source.positions    array_add(*dest.positions, it);
+    for source.rgba_colors  array_add(*dest.rgba_colors, it);
+    for source.indices      array_add(*dest.indices, it + base_idx);
+}
+
 merge :: (dest: *Indexed_Triangle_Positions_Colors, source: Indexed_Triangle_Positions_Colors) {
     base_idx := cast(u32) dest.positions.count;
     
