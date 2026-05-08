@@ -164,25 +164,30 @@ random_get_vector_zero_to_one :: () -> Vector3 {
     return .{random_get_zero_to_one(), random_get_zero_to_one(), random_get_zero_to_one()};
 }
 
-// this function copies the data
-create_itpc_with_color_variation :: (itp : Indexed_Triangle_Positions, color: Vector3 = NEGATIVE_ONE3, max_color_change :float = 0.2) -> Indexed_Triangle_Positions_Colors {
-
-    itpc : Indexed_Triangle_Positions_Colors;
-    for itp.indices array_add(*itpc.indices, it);
-    for itp.positions array_add(*itpc.positions, it);
-    array_reserve(*itpc.rgb_colors, itpc.positions.count); 
-
+fill_color_variation :: (itpc: *Indexed_Triangle_Positions_Colors, color: Vector3, max_color_change: float) {
     base_color := color;
-    if color == -ONE3 base_color = random_get_vector_zero_to_one();
+    if color == -ONE3  base_color = random_get_vector_zero_to_one();
 
+    array_reserve(*itpc.rgb_colors, itpc.positions.count);
     for 1..itpc.positions.count {
-
-        // [-.5, .5] * 2 = [-1, 1] * scale = [-max_color_change, max_color_change];
-        color_change := (random_get_vector_zero_to_one() - ONE3 * .5) * max_color_change;
-        new_color := saturate(base_color + color_change);
-
-        array_add(*itpc.rgb_colors, new_color);  
+        color_change := (random_get_vector_zero_to_one() - ONE3 * 0.5) * max_color_change;
+        array_add(*itpc.rgb_colors, saturate(base_color + color_change));
     }
+}
+
+create_itpc_with_color_variation :: (itp: Indexed_Triangle_Positions, color: Vector3 = NEGATIVE_ONE3, max_color_change: float = 0.2) -> Indexed_Triangle_Positions_Colors {
+    itpc: Indexed_Triangle_Positions_Colors;
+    itpc.indices   = itp.indices;
+    itpc.positions = itp.positions;
+    fill_color_variation(*itpc, color, max_color_change);
+    return itpc;
+}
+
+create_itpc_with_color_variation_copy :: (itp: Indexed_Triangle_Positions, color: Vector3 = NEGATIVE_ONE3, max_color_change: float = 0.2) -> Indexed_Triangle_Positions_Colors {
+    itpc: Indexed_Triangle_Positions_Colors;
+    array_copy(*itpc.indices,   itp.indices);
+    array_copy(*itpc.positions, itp.positions);
+    fill_color_variation(*itpc, color, max_color_change);
     return itpc;
 }
 
@@ -389,6 +394,123 @@ create_cylinder_between :: (p1: Vector3, p2: Vector3, segments: int, radius: flo
         array_add(*result.indices, bottom2);
     }
     
+    return result;
+}
+
+create_torus :: (
+    center: Vector3 = .{0, 0, 0},
+    normal: Vector3 = .{0, 0, 1},       // axis the torus is oriented around
+    major_radius: float,                 // distance from center to tube center
+    minor_radius: float,                 // radius of the tube itself
+    major_segments: int,                 // segments around the main ring
+    minor_segments: int                  // segments around the tube
+) -> Indexed_Triangle_Positions {
+
+    result: Indexed_Triangle_Positions;
+
+    // build an orthonormal basis from the normal
+    u := arbitrary_unit_perpendicular(normal);
+    v := normalized_cross(normal, u);
+
+    major_step := FULL_TURN / cast(float) major_segments;
+    minor_step := FULL_TURN / cast(float) minor_segments;
+
+    // generate vertices
+    // for each point on the major ring, generate a ring of minor_segments vertices around the tube
+    for maj: 0..major_segments-1 {
+        major_angle := cast(float) maj * major_step;
+
+        // point on the major ring (center of this tube cross-section)
+        ring_center := center
+            + major_radius * (cos_turns(major_angle) * u + sin_turns(major_angle) * v);
+
+        // outward direction from the torus axis to this ring center
+        radial_dir := unit_vector(ring_center - center);
+
+        for min: 0..minor_segments-1 {
+            minor_angle := cast(float) min * minor_step;
+
+            // position on the tube cross-section
+            pos := ring_center
+                + minor_radius * (cos_turns(minor_angle) * radial_dir
+                                + sin_turns(minor_angle) * normal);
+
+            array_add(*result.positions, pos);
+        }
+    }
+
+    // generate indices
+    // vertex index: maj * minor_segments + min
+    for maj: 0..major_segments-1 {
+        next_maj := (maj + 1) % major_segments;
+
+        for min: 0..minor_segments-1 {
+            next_min := (min + 1) % minor_segments;
+
+            v00 := cast(u32)(maj      * minor_segments + min);
+            v10 := cast(u32)(next_maj * minor_segments + min);
+            v01 := cast(u32)(maj      * minor_segments + next_min);
+            v11 := cast(u32)(next_maj * minor_segments + next_min);
+
+            // quad as two CCW triangles
+            array_add(*result.indices, v00);
+            array_add(*result.indices, v10);
+            array_add(*result.indices, v11);
+
+            array_add(*result.indices, v00);
+            array_add(*result.indices, v11);
+            array_add(*result.indices, v01);
+        }
+    }
+
+    return result;
+}
+
+create_cone :: (
+    tip: Vector3,
+    base_center: Vector3,
+    radius: float,
+    segments: int
+) -> Indexed_Triangle_Positions {
+
+    result: Indexed_Triangle_Positions;
+
+    axis := base_center - tip;
+    up   := unit_vector(axis);
+
+    u := arbitrary_unit_perpendicular(up);
+    v  := normalized_cross(up, u);
+
+    angle_step := FULL_TURN / cast(float) segments;
+
+    // tip vertex at index 0
+    array_add(*result.positions, tip);
+
+    // base center vertex at index 1
+    array_add(*result.positions, base_center);
+
+    // base ring vertices starting at index 2
+    for i: 0..segments-1 {
+        angle := cast(float) i * angle_step;
+        offset := radius * (cos_turns(angle) * u + sin_turns(angle) * v);
+        array_add(*result.positions, base_center + offset);
+    }
+
+    for i: 0..segments-1 {
+        curr := cast(u32)(2 + i);
+        next := cast(u32)(2 + (i + 1) % segments);
+
+        // side face: tip -> next -> curr (CCW from outside)
+        array_add(*result.indices, 0);
+        array_add(*result.indices, next);
+        array_add(*result.indices, curr);
+
+        // base face: base_center -> curr -> next (CCW looking from below)
+        array_add(*result.indices, 1);
+        array_add(*result.indices, curr);
+        array_add(*result.indices, next);
+    }
+
     return result;
 }
 
@@ -643,8 +765,8 @@ create_star :: (center_x: float, center_y: float, outer_radius: float, inner_rad
         }
 
         array_add(*result.positions, Vector3.{
-            center_x + radius * cos(angle),
-            center_y + radius * sin(angle),
+            center_x + radius * cos_turns(angle),
+            center_y + radius * sin_turns(angle),
             0.0,
         });
     }
