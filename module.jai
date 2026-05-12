@@ -55,6 +55,190 @@ translate_copy :: (itp: Indexed_Triangle_Positions, offset: Vector3) -> Indexed_
     return result;
 }
 
+polygon_normal :: (positions : [] Vector3) -> Vector3 {
+    normal := ZERO3;
+
+    for i : 0..positions.count-1 {
+        current := positions[i];
+        next := positions[(i + 1) % positions.count];
+
+        normal.x += (current.y - next.y) * (current.z + next.z);
+        normal.y += (current.z - next.z) * (current.x + next.x);
+        normal.z += (current.x - next.x) * (current.y + next.y);
+    }
+
+    return normal;
+}
+
+dominant_axis_to_drop :: (normal : Vector3) -> int {
+    abs_x := abs(normal.x);
+    abs_y := abs(normal.y);
+    abs_z := abs(normal.z);
+
+    if abs_x >= abs_y && abs_x >= abs_z return 0;
+    if abs_y >= abs_z return 1;
+    return 2;
+}
+
+project_for_triangulation :: (position : Vector3, axis_to_drop : int) -> Vector2 {
+    if axis_to_drop == 0 return .{position.y, position.z};
+    if axis_to_drop == 1 return .{position.x, position.z};
+    return .{position.x, position.y};
+}
+
+cross_2d :: (a : Vector2, b : Vector2, c : Vector2) -> float {
+    ab := b - a;
+    ac := c - a;
+    return ab.x * ac.y - ab.y * ac.x;
+}
+
+signed_polygon_area_2d :: (positions : [] Vector2) -> float {
+    area := 0.0;
+    for i : 0..positions.count-1 {
+        current := positions[i];
+        next := positions[(i + 1) % positions.count];
+        area += current.x * next.y - next.x * current.y;
+    }
+    return area * 0.5;
+}
+
+point_in_triangle_2d :: (point : Vector2, a : Vector2, b : Vector2, c : Vector2, ccw : bool) -> bool {
+    epsilon :: 0.000001;
+
+    ab := cross_2d(a, b, point);
+    bc := cross_2d(b, c, point);
+    ca := cross_2d(c, a, point);
+
+    if ccw {
+        return ab >= -epsilon && bc >= -epsilon && ca >= -epsilon;
+    } else {
+        return ab <= epsilon && bc <= epsilon && ca <= epsilon;
+    }
+}
+
+triangulate_polygon_fan :: (positions : [] Vector3) -> [..] u32 {
+    indices : [..] u32;
+    if positions.count < 3 return indices;
+
+    array_reserve(*indices, (positions.count - 2) * 3);
+
+    for i : 1..positions.count-2 {
+        array_add(*indices, 0);
+        array_add(*indices, cast(u32)i);
+        array_add(*indices, cast(u32)(i + 1));
+    }
+
+    return indices;
+}
+
+triangulate_polygon :: (positions : [] Vector3) -> [..] u32 {
+    if positions.count < 3 {
+        indices : [..] u32;
+        return indices;
+    }
+
+    if positions.count == 3 return triangulate_polygon_fan(positions);
+
+    projected : [..] Vector2;
+    projected.allocator = temp;
+    array_reserve(*projected, positions.count);
+
+    normal := polygon_normal(positions);
+    axis_to_drop := dominant_axis_to_drop(normal);
+
+    for position : positions {
+        array_add(*projected, project_for_triangulation(position, axis_to_drop));
+    }
+
+    ccw := signed_polygon_area_2d(projected) > 0;
+
+    remaining : [..] int;
+    remaining.allocator = temp;
+    array_reserve(*remaining, positions.count);
+    for i : 0..positions.count-1 array_add(*remaining, i);
+
+    triangulated_indices : [..] u32;
+    array_reserve(*triangulated_indices, (positions.count - 2) * 3);
+
+    guard := 0;
+    while remaining.count > 3 {
+        ear_found := false;
+
+        for remaining_index : 0..remaining.count-1 {
+            prev_index := remaining[(remaining_index + remaining.count - 1) % remaining.count];
+            current_index := remaining[remaining_index];
+            next_index := remaining[(remaining_index + 1) % remaining.count];
+
+            a := projected[prev_index];
+            b := projected[current_index];
+            c := projected[next_index];
+
+            corner_cross := cross_2d(a, b, c);
+            if ccw {
+                if corner_cross <= 0.000001 continue;
+            } else {
+                if corner_cross >= -0.000001 continue;
+            }
+
+            contains_other_vertex := false;
+            for test_index : remaining {
+                if test_index == prev_index || test_index == current_index || test_index == next_index continue;
+                if point_in_triangle_2d(projected[test_index], a, b, c, ccw) {
+                    contains_other_vertex = true;
+                    break;
+                }
+            }
+
+            if contains_other_vertex continue;
+
+            array_add(*triangulated_indices, cast(u32)prev_index);
+            array_add(*triangulated_indices, cast(u32)current_index);
+            array_add(*triangulated_indices, cast(u32)next_index);
+            array_ordered_remove_by_index(*remaining, remaining_index);
+            ear_found = true;
+            break;
+        }
+
+        if !ear_found {
+            array_free(triangulated_indices);
+            return triangulate_polygon_fan(positions);
+        }
+
+        guard += 1;
+        if guard > positions.count * positions.count {
+            array_free(triangulated_indices);
+            return triangulate_polygon_fan(positions);
+        }
+    }
+
+    if remaining.count == 3 {
+        array_add(*triangulated_indices, cast(u32)remaining[0]);
+        array_add(*triangulated_indices, cast(u32)remaining[1]);
+        array_add(*triangulated_indices, cast(u32)remaining[2]);
+    }
+
+    return triangulated_indices;
+}
+
+append_triangulated_polygon_indices :: (indices : *[..] u32, positions : [] Vector3, first_index : u32, count : int) {
+    if count < 3 return;
+
+    polygon_positions : [..] Vector3;
+    polygon_positions.allocator = temp;
+    array_reserve(*polygon_positions, count);
+
+    for i : 0..count-1 {
+        array_add(*polygon_positions, positions[first_index + cast(u32)i]);
+    }
+
+    local_indices := triangulate_polygon(polygon_positions);
+    defer array_free(local_indices);
+
+    for local_indices {
+        array_add(indices, first_index + it);
+    }
+}
+
 
 
 Indexed_Triangle_Positions_Colors :: struct {
@@ -789,5 +973,3 @@ create_star :: (center_x: float, center_y: float, outer_radius: float, inner_rad
 #load "bezier_triangle.jai";
 #load "biquadratic_bezier_patch.jai";
 #load "adjacency_mesh.jai";
-
-
