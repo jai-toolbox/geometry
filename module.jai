@@ -529,36 +529,45 @@ create_sphere :: (
     latitude_segments: int = 16,
     longitude_segments: int = 32
 ) -> Indexed_Triangle_Positions {
+    return create_ellipsoid(center, Vector3.{radius, radius, radius}, latitude_segments, longitude_segments);
+}
+
+create_ellipsoid :: (
+    center: Vector3 = .{0, 0, 0},
+    radii: Vector3 = .{1, 1, 1},
+    latitude_segments: int = 16,
+    longitude_segments: int = 32
+) -> Indexed_Triangle_Positions {
     result: Indexed_Triangle_Positions;
 
-    assert(radius >= 0.0, "radius must be non-negative");
+    assert(radii.x >= 0.0 && radii.y >= 0.0 && radii.z >= 0.0, "radii must be non-negative");
     assert(latitude_segments >= 2, "latitude_segments must be at least 2");
     assert(longitude_segments >= 3, "longitude_segments must be at least 3");
 
     top_index: u32 = 0;
-    array_add(*result.positions, center + Vector3.{0, radius, 0});
+    array_add(*result.positions, center + Vector3.{0, radii.y, 0});
 
     latitude_step := (FULL_TURN / 2.0) / cast(float) latitude_segments;
     longitude_step := FULL_TURN / cast(float) longitude_segments;
 
     for lat: 1..latitude_segments-1 {
         theta := cast(float) lat * latitude_step;
-        ring_radius := sin_turns(theta) * radius;
-        y := cos_turns(theta) * radius;
+        ring_radius := sin_turns(theta);
+        y := cos_turns(theta) * radii.y;
 
         for lon: 0..longitude_segments-1 {
             phi := cast(float) lon * longitude_step;
 
             array_add(*result.positions, center + Vector3.{
-                cos_turns(phi) * ring_radius,
+                cos_turns(phi) * ring_radius * radii.x,
                 y,
-                sin_turns(phi) * ring_radius
+                sin_turns(phi) * ring_radius * radii.z
             });
         }
     }
 
     bottom_index := cast(u32) result.positions.count;
-    array_add(*result.positions, center + Vector3.{0, -radius, 0});
+    array_add(*result.positions, center + Vector3.{0, -radii.y, 0});
 
     first_ring_index: u32 = 1;
     last_ring_index := cast(u32)(1 + (latitude_segments - 2) * longitude_segments);
