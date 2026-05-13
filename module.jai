@@ -523,6 +523,87 @@ create_box :: (origin : Vector3 = .{0, 0, 0}, size_x : float = 1, size_y : float
     return box;
 }
 
+create_sphere :: (
+    center: Vector3 = .{0, 0, 0},
+    radius: float = 1.0,
+    latitude_segments: int = 16,
+    longitude_segments: int = 32
+) -> Indexed_Triangle_Positions {
+    result: Indexed_Triangle_Positions;
+
+    assert(radius >= 0.0, "radius must be non-negative");
+    assert(latitude_segments >= 2, "latitude_segments must be at least 2");
+    assert(longitude_segments >= 3, "longitude_segments must be at least 3");
+
+    top_index: u32 = 0;
+    array_add(*result.positions, center + Vector3.{0, radius, 0});
+
+    latitude_step := (FULL_TURN / 2.0) / cast(float) latitude_segments;
+    longitude_step := FULL_TURN / cast(float) longitude_segments;
+
+    for lat: 1..latitude_segments-1 {
+        theta := cast(float) lat * latitude_step;
+        ring_radius := sin_turns(theta) * radius;
+        y := cos_turns(theta) * radius;
+
+        for lon: 0..longitude_segments-1 {
+            phi := cast(float) lon * longitude_step;
+
+            array_add(*result.positions, center + Vector3.{
+                cos_turns(phi) * ring_radius,
+                y,
+                sin_turns(phi) * ring_radius
+            });
+        }
+    }
+
+    bottom_index := cast(u32) result.positions.count;
+    array_add(*result.positions, center + Vector3.{0, -radius, 0});
+
+    first_ring_index: u32 = 1;
+    last_ring_index := cast(u32)(1 + (latitude_segments - 2) * longitude_segments);
+
+    for lon: 0..longitude_segments-1 {
+        next := (lon + 1) % longitude_segments;
+
+        array_add(*result.indices, top_index);
+        array_add(*result.indices, first_ring_index + cast(u32) next);
+        array_add(*result.indices, first_ring_index + cast(u32) lon);
+    }
+
+    for lat: 0..latitude_segments-3 {
+        current_ring := cast(u32)(1 + lat * longitude_segments);
+        next_ring := cast(u32)(1 + (lat + 1) * longitude_segments);
+
+        for lon: 0..longitude_segments-1 {
+            next_lon := (lon + 1) % longitude_segments;
+
+            v00 := current_ring + cast(u32) lon;
+            v01 := current_ring + cast(u32) next_lon;
+            v10 := next_ring + cast(u32) lon;
+            v11 := next_ring + cast(u32) next_lon;
+
+            array_add(*result.indices, v00);
+            array_add(*result.indices, v01);
+            array_add(*result.indices, v11);
+
+            array_add(*result.indices, v00);
+            array_add(*result.indices, v11);
+            array_add(*result.indices, v10);
+        }
+    }
+
+    for lon: 0..longitude_segments-1 {
+        next := (lon + 1) % longitude_segments;
+
+        array_add(*result.indices, last_ring_index + cast(u32) lon);
+        array_add(*result.indices, last_ring_index + cast(u32) next);
+        array_add(*result.indices, bottom_index);
+    }
+
+    return result;
+}
+
 create_cylinder_between :: (p1: Vector3, p2: Vector3, segments: int, radius: float) -> Indexed_Triangle_Positions {
     result: Indexed_Triangle_Positions;
     
