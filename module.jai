@@ -788,6 +788,61 @@ create_cone :: (
     return result;
 }
 
+create_3d_arrow :: (start: Vector3, end: Vector3, num_segments: int, stem_thickness: float) -> Indexed_Triangle_Positions {
+    dir := end - start;
+    len := length(dir);
+
+    tip_length := 0.3 * len;
+    tip_base   := end - unit_vector(dir) * tip_length;
+
+    stem := create_cylinder_between(start, tip_base, num_segments, stem_thickness);
+    tip  := create_cone(end, tip_base, stem_thickness * 2.0, num_segments);
+
+    merge(*stem, tip);
+    return stem;
+}
+
+create_3d_arrow_with_ratio :: (start: Vector3, end: Vector3, num_segments: int = 8, length_thickness_ratio: float = 0.1) -> Indexed_Triangle_Positions {
+    len             := length(end - start);
+    stem_thickness  := len * length_thickness_ratio;
+    return create_3d_arrow(start, end, num_segments, stem_thickness);
+}
+
+connect_points_by_arrows :: (points: [] Vector3, num_segments: int = 8, length_thickness_ratio: float = 0.1) -> Indexed_Triangle_Positions {
+    result: Indexed_Triangle_Positions;
+
+    if points.count < 2  return result;
+
+    num_consecutive_identical := 0;
+    last_non_zero_dir : Vector3;
+    has_last_dir      := false;
+
+    for i: 0..points.count-2 {
+        start := points[i];
+        end   := points[i + 1];
+
+        if start == end {
+            num_consecutive_identical += 1;
+            if has_last_dir {
+                radius := cast(float) num_consecutive_identical / 100.0;
+                marker := create_circle(start, unit_vector(last_non_zero_dir), radius, 5);
+                merge(*result, marker);
+            }
+        } else {
+            num_consecutive_identical = 0;
+            last_non_zero_dir = end - start;
+            has_last_dir      = true;
+
+            seg := create_3d_arrow_with_ratio(start, end, num_segments, length_thickness_ratio);
+            merge(*result, seg);
+        }
+    }
+
+    return result;
+}
+
+
+
 /*
  Create the points of an arrow pointing from one point to another
 
