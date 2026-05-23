@@ -112,7 +112,7 @@ link_shared_edges :: (mesh: *Adjacency_Mesh) {
         b := it.next_edge_around_face.start_vertex;
 
         reverse := Edge_Key.{b, a};
-        other_face_edge, found := table_find(*edge_map, reverse);
+        found, other_face_edge := table_find(*edge_map, reverse);
 
         if found {
             it.same_edge_other_face               = other_face_edge;
@@ -468,7 +468,7 @@ make_itp_from_adjacency_mesh :: (adj: *Adjacency_Mesh) -> Indexed_Triangle_Posit
     defer deinit(*vertex_index_map);
 
     get_or_add :: (result: *Indexed_Triangle_Positions, map: *Table(*Vertex, u32), v: *Vertex) -> u32 {
-        idx, found := table_find(map, v);
+        found, idx := table_find(map, v);
         if found return idx;
         idx = cast(u32) result.positions.count;
         array_add(*result.positions, v.position);
@@ -506,7 +506,7 @@ make_itpn_from_adjacency_mesh :: (adj: *Adjacency_Mesh) -> Indexed_Triangle_Posi
     defer deinit(*vertex_index_map);
 
     get_or_add :: (result: *Indexed_Triangle_Position_Normals, map: *Table(*Vertex, u32), v: *Vertex) -> u32 {
-        idx, found := table_find(map, v);
+        found, idx := table_find(map, v);
         if found return idx;
         idx = cast(u32) result.positions.count;
         array_add(*result.positions, v.position);
