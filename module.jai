@@ -254,9 +254,15 @@ deinit :: (using itpc: *Indexed_Triangle_Positions_Colors) {
 }
 
 Indexed_Triangle_Positions_Color_Alphas :: struct {
-    indices : [..] u32; 
-    positions : [..] Vector3; 
+    indices : [..] u32;
+    positions : [..] Vector3;
     rgba_colors : [..] Vector4; 
+}
+
+deinit :: (using itpca: *Indexed_Triangle_Positions_Color_Alphas) {
+    array_free(indices);
+    array_free(positions);
+    array_free(rgba_colors);
 }
 
 merge :: (dest: *Indexed_Triangle_Positions_Color_Alphas, source: Indexed_Triangle_Positions_Color_Alphas) {
@@ -799,6 +805,7 @@ create_3d_arrow :: (start: Vector3, end: Vector3, num_segments: int, stem_thickn
     tip  := create_cone(end, tip_base, stem_thickness * 2.0, num_segments);
 
     merge(*stem, tip);
+    deinit(*tip);
     return stem;
 }
 
