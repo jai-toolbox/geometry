@@ -381,6 +381,39 @@ create_itpc_with_color_variation_copy :: (itp: Indexed_Triangle_Positions, color
     return itpc;
 }
 
+create_itpc_with_per_triangle_color_variation :: (itp: Indexed_Triangle_Positions, color: Vector3 = NEGATIVE_ONE3, max_color_change: float = 0.2) -> Indexed_Triangle_Positions_Colors {
+    itpc: Indexed_Triangle_Positions_Colors;
+    base_color := color;
+    if color == -ONE3 base_color = random_get_vector_zero_to_one();
+
+    triangle_count := itp.indices.count / 3;
+    array_reserve(*itpc.indices, triangle_count * 3);
+    array_reserve(*itpc.positions, triangle_count * 3);
+    array_reserve(*itpc.rgb_colors, triangle_count * 3);
+
+    i := 0;
+    while i + 2 < itp.indices.count {
+        triangle_color := saturate(base_color + (random_get_vector_zero_to_one() - ONE3 * 0.5) * max_color_change);
+        base_index := cast(u32) itpc.positions.count;
+
+        array_add(*itpc.positions, itp.positions[itp.indices[i]]);
+        array_add(*itpc.positions, itp.positions[itp.indices[i + 1]]);
+        array_add(*itpc.positions, itp.positions[itp.indices[i + 2]]);
+
+        array_add(*itpc.indices, base_index);
+        array_add(*itpc.indices, base_index + 1);
+        array_add(*itpc.indices, base_index + 2);
+
+        array_add(*itpc.rgb_colors, triangle_color);
+        array_add(*itpc.rgb_colors, triangle_color);
+        array_add(*itpc.rgb_colors, triangle_color);
+
+        i += 3;
+    }
+
+    return itpc;
+}
+
 create_rectangle :: (center: Vector3, center_to_edge_a: Vector3, center_to_edge_b: Vector3) -> Indexed_Triangle_Positions {
     rect : Indexed_Triangle_Positions;
 
