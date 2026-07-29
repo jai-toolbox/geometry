@@ -7,6 +7,16 @@
 #import "tbx/math";
 #import "tbx/rectangle";
 
+/*
+
+So after thinking about this naming for a while I think that Triangles could be the best name, and then its just
+
+Triangles_Normal_Color 
+ 
+etc like this, saying position etc is probably not even required anymore.
+
+*/
+
 Indexed_Triangle_Positions :: struct {
     indices : [..] u32; 
     positions : [..] Vector3; 
