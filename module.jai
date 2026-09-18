@@ -1118,6 +1118,7 @@ rectangle_to_itp :: (rectangle: Rectangle, z: float = 0.0) -> Indexed_Triangle_P
     return create_quad(x0, y0, x1, y1, z);
 }
 
+// this creates a quad on the XY plane.
 create_quad :: (x0: float = -1.0, y0: float = -1.0, x1: float = 1.0, y1: float = 1.0, z: float = 0.0) -> Indexed_Triangle_Positions {
     itp: Indexed_Triangle_Positions;
     
