@@ -449,6 +449,54 @@ create_itpc_with_per_triangle_color_variation :: (itp: Indexed_Triangle_Position
     return itpc;
 }
 
+// Samples z = f(x, y) on an inclusive rectangular XY grid. Cell counts are
+// subdivisions, so the mesh has (cells_x + 1) * (cells_y + 1) shared vertices
+// and 2 * cells_x * cells_y triangles. Triangles face toward positive Z.
+// The caller owns the returned arrays and releases them with deinit.
+create_function_surface :: (
+    f: (x: float, y: float) -> float,
+    min_xy: Vector2,
+    max_xy: Vector2,
+    cells_x: int = 100,
+    cells_y: int = 100,
+) -> Indexed_Triangle_Positions {
+    assert(f != null, "A surface requires a height function");
+    assert(cells_x > 0 && cells_y > 0, "Surface cell counts must be positive");
+    assert(max_xy.x > min_xy.x && max_xy.y > min_xy.y, "Surface bounds must increase along both axes");
+
+    result: Indexed_Triangle_Positions;
+    row_width := cells_x + 1;
+    array_reserve(*result.positions, row_width * (cells_y + 1));
+    array_reserve(*result.indices, 6 * cells_x * cells_y);
+
+    for row: 0..cells_y {
+        y := min_xy.y + (max_xy.y - min_xy.y) * (cast(float) row / cast(float) cells_y);
+        if row == cells_y y = max_xy.y;
+        for col: 0..cells_x {
+            x := min_xy.x + (max_xy.x - min_xy.x) * (cast(float) col / cast(float) cells_x);
+            if col == cells_x x = max_xy.x;
+            array_add(*result.positions, Vector3.{x, y, f(x, y)});
+        }
+    }
+
+    for row: 0..cells_y-1 {
+        for col: 0..cells_x-1 {
+            a := cast(u32) (row * row_width + col);
+            b := a + 1;
+            c := cast(u32) ((row + 1) * row_width + col);
+            d := c + 1;
+            array_add(*result.indices, a);
+            array_add(*result.indices, b);
+            array_add(*result.indices, d);
+            array_add(*result.indices, a);
+            array_add(*result.indices, d);
+            array_add(*result.indices, c);
+        }
+    }
+
+    return result;
+}
+
 create_rectangle :: (center: Vector3, center_to_edge_a: Vector3, center_to_edge_b: Vector3) -> Indexed_Triangle_Positions {
     rect : Indexed_Triangle_Positions;
 
